@@ -284,7 +284,7 @@ int ::ARFCNManager::sendCommandPacket(const char* command, char* response)
 
 	for (int retry=0; retry<5; retry++) {
 		mControlSocket.write(command);
-		msgLen = mControlSocket.read(response,1000);
+		msgLen = mControlSocket.read(response,2000);
 		if (msgLen>0) {
 			response[msgLen] = '\0';
 			break;
@@ -299,6 +299,7 @@ int ::ARFCNManager::sendCommandPacket(const char* command, char* response)
 
 	mControlLock.unlock();
 	LOG(INFO) << "response " << response;
+	std::cout << "response: " << response << std::endl;
 
 	if ((msgLen>4) && (strncmp(response,"RSP ",4)==0)) {
 		return msgLen;
@@ -323,6 +324,8 @@ int ::ARFCNManager::sendCommand(const char*command, const char*param, int *respo
 	char cmdNameTest[15];
 	int status;
 	cmdNameTest[0]='\0';
+	LOG(ALERT) << "cmd: " << command;
+	LOG(ALERT) << "resp: " << response;
         if (!responseParam)
 	  sscanf(response,"RSP %15s %d", cmdNameTest, &status);
         else
@@ -343,6 +346,8 @@ int ::ARFCNManager::sendCommand(const char*command, int param, int *responsePara
 	char cmdNameTest[15];
 	int status;
 	cmdNameTest[0]='\0';
+	LOG(ALERT) << "cmd: " << command;
+	LOG(ALERT) << "resp: " << response;
         if (!responseParam)
 	  sscanf(response,"RSP %15s %d", cmdNameTest, &status);
         else
@@ -364,6 +369,8 @@ int ::ARFCNManager::sendCommand(const char*command, const char* param)
 	char cmdNameTest[15];
 	int status;
 	cmdNameTest[0]='\0';
+	LOG(ALERT) << "cmd: " << command;
+	LOG(ALERT) << "resp: " << response;
 	sscanf(response,"RSP %15s %d", cmdNameTest, &status);
 	if (strcmp(cmdNameTest,command)!=0) return -1;
 	return status;
@@ -383,6 +390,8 @@ int ::ARFCNManager::sendCommand(const char*command)
 	char cmdNameTest[15];
 	int status;
 	cmdNameTest[0]='\0';
+	LOG(ALERT) << "cmd: " << command;
+	LOG(ALERT) << "resp: " << response;
 	sscanf(response,"RSP %15s %d", cmdNameTest, &status);
 	if (strcmp(cmdNameTest,command)!=0) return -1;
 	return status;

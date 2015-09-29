@@ -327,6 +327,7 @@ Transceiver::CorrType Transceiver::expectedCorrType(GSM::Time currTime)
 
 }
 
+#include <fstream>
 SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
 				      int &RSSI,
 				      int &timingOffset)
@@ -350,6 +351,23 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
   }
 
   signalVector *vectorBurst = rxBurst;
+
+  ofstream vfile("vector-dump.bin", ios::out | ios::app | ios::binary);
+  //ofstream rfile("rach-slot-dump.bin", ios::out | ios::app | ios::binary);  
+  for (signalVector::const_iterator it = vectorBurst->begin(); it != vectorBurst->end(); it++) {
+  	//std::cout << "size of complex: " << sizeof(*it) << std::endl;
+  	//std::cout << it->real() << "," << it->imag() << " ";
+	complex temp;
+	if (corrType == RACH)	temp = complex(6000.0, it->imag());
+	else			temp = complex(-6000.0, it->imag());
+	vfile.write((char*)(&temp), (std::streamsize)sizeof(*it));
+
+	//complex temp;
+	//if (corrType != TSC)	temp = complex(10000.0,10000.0);
+	//else			temp = complex(-10000.0, -10000.0);
+	//rfile.write((char*)&temp, (std::streamsize)sizeof(*it));
+  }
+  //std::cout << "------------------------------------------" << std::endl;
 
   energyDetect(*vectorBurst, 20 * mSPSRx, 0.0, &avg);
 
@@ -385,6 +403,7 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
 				  &channelResp,
 				  &chanOffset);
     if (success) {
+      std::cout << "----- TSC burst processed\n";
       SNRestimate[timeslot] = amplitude.norm2()/(mNoiseLev*mNoiseLev+1.0); // this is not highly accurate
       if (estimateChannel) {
          LOG(DEBUG) << "estimating channel...";
@@ -406,6 +425,7 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
     // RACH burst
     success = detectRACHBurst(*vectorBurst, 6.0, mSPSRx, &amplitude, &TOA);
     if (success > 0) {
+      std::cout << "----- RACH burst processed\n";
       channelResponse[timeslot] = NULL;
     } else if (success == 0) {
       mNoises.insert(avg);
@@ -738,11 +758,11 @@ void Transceiver::driveReceiveFIFO()
 
   if (rxBurst) { 
 
-    LOG(DEBUG) << "burst parameters: "
+    std::cout << "burst parameters: "
 	  << " time: " << burstTime
 	  << " RSSI: " << RSSI
 	  << " TOA: "  << TOA
-	  << " bits: " << *rxBurst;
+	  << " bits: " << *rxBurst << std::endl;
     
     char burstString[gSlotLen+10];
     burstString[0] = burstTime.TN();
