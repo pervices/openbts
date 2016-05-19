@@ -36,6 +36,9 @@
 #define X3XX_CLK_RT      104e6
 #define B100_BASE_RT     400000
 #define USRP2_BASE_RT    390625
+#define CRIMSON_BASE_RT  390625
+//#define CRIMSON_BASE_RT  358072.916667
+//#define CRIMSON_BASE_RT  381831.309242
 #define TX_AMPL          0.3
 #define SAMPLE_BUF_SZ    (1 << 20)
 
@@ -78,9 +81,10 @@ static struct uhd_dev_offset uhd_offsets[NUM_USRP_TYPES * 2] = {
 	{ X3XX,    1, 1.5360e-4 },
 	{ X3XX,    4, 1.1264e-4 },
 	{ UMTRX,   1, 9.9692e-5 },
-	{ UMTRX,   4, 7.3846e-5 },
-	{ CRIMSON, 1, 1.0180e-3 },
-	{ CRIMSON, 4, 1.4000e-3 },
+	{ UMTRX,   4, 7.3846e-5 },	
+	{ CRIMSON, 1, 0 },
+	{ CRIMSON, 4, 0}
+
 };
 
 static double get_dev_offset(enum uhd_dev_type type, int sps)
@@ -112,7 +116,6 @@ static double select_rate(uhd_dev_type type, int sps)
 		return -9999.99;
 
 	switch (type) {
-	case CRIMSON:
 	case USRP2:
 	case X3XX:
 		return USRP2_BASE_RT * sps;
@@ -121,6 +124,8 @@ static double select_rate(uhd_dev_type type, int sps)
 	case B2XX:
 	case UMTRX:
 		return GSMRATE * sps;
+	case CRIMSON:
+		return CRIMSON_BASE_RT * sps;
 	default:
 		break;
 	}
@@ -298,6 +303,7 @@ private:
 	uhd::time_spec_t prev_ts;
 
 	TIMESTAMP ts_offset;
+	TIMESTAMP ts_crimson_start;
 	smpl_buf *rx_smpl_buf;
 
 	void init_gains();
@@ -563,6 +569,14 @@ int uhd_device::open(const std::string &args, bool extref)
 	if (extref)
 		set_ref_clk(true);
 
+	if (dev_type == CRIMSON){
+		//Rate should be set first for Crimson
+		double txrate = select_rate(dev_type, sps);
+		double rxrate = txrate / sps;
+		if ((txrate > 0.0) && (set_rates(txrate, rxrate) < 0))
+			return -1;
+	}
+
 	// Create TX and RX streamers
 	uhd::stream_args_t stream_args("sc16");
 	tx_stream = usrp_dev->get_tx_stream(stream_args);
@@ -573,11 +587,14 @@ int uhd_device::open(const std::string &args, bool extref)
 	rx_spp = rx_stream->get_max_num_samps();
 
 	// Set rates
-	double _tx_rate = select_rate(dev_type, sps);
-	double _rx_rate = _tx_rate / sps;
-	if ((_tx_rate > 0.0) && (set_rates(_tx_rate, _rx_rate) < 0))
-		return -1;
-
+	if (dev_type == CRIMSON){
+		void();//	tx_stream->disable_fc();
+	}else{
+		double _tx_rate = select_rate(dev_type, sps);
+		double _rx_rate = _tx_rate / sps;
+		if ((_tx_rate > 0.0) && (set_rates(_tx_rate, _rx_rate) < 0))
+			return -1;
+	}
 	// Create receive buffer
 	size_t buf_len = SAMPLE_BUF_SZ / sizeof(uint32_t);
 	rx_smpl_buf = new smpl_buf(buf_len, rx_rate);
@@ -590,7 +607,7 @@ int uhd_device::open(const std::string &args, bool extref)
 	} else  {
 		ts_offset = (TIMESTAMP) (offset * rx_rate);
 	}
-
+	ts_crimson_start = (TIMESTAMP)0;
 	// Initialize and shadow gain values 
 	init_gains();
 
@@ -604,7 +621,7 @@ int uhd_device::open(const std::string &args, bool extref)
 	case X3XX:
 		return RESAMP_100M;
 	case CRIMSON:
-		return RESAMP_100M_NO_RXOFF;
+		return RESAMP_322M;
 	}
 
 	return NORMAL;
@@ -612,15 +629,16 @@ int uhd_device::open(const std::string &args, bool extref)
 
 bool uhd_device::flush_recv(size_t num_pkts)
 {
+
 	uhd::rx_metadata_t md;
 	size_t num_smpls;
 	uint32_t buff[rx_spp];
 	float timeout;
-
 	// Use .01 sec instead of the default .1 sec
 	timeout = .01;
-
+	if (dev_type == CRIMSON)timeout = .0007;
 	for (size_t i = 0; i < num_pkts; i++) {
+		std::cout<<"num_pkts: "<<i<<std::endl;
 		num_smpls = rx_stream->recv(buff, rx_spp, md,
 					    timeout, true);
 		if (!num_smpls) {
@@ -631,8 +649,9 @@ bool uhd_device::flush_recv(size_t num_pkts)
 				continue;
 			}
 		}
+		//Apply new offset to allign current read to current data... this is because we cant set rx timestamps
+		if (dev_type == CRIMSON) ts_crimson_start = convert_time(md.time_spec, this->rx_rate) + (TIMESTAMP)num_smpls;
 	}
-
 	return true;
 }
 
@@ -641,8 +660,8 @@ void uhd_device::restart(uhd::time_spec_t ts)
 	uhd::stream_cmd_t cmd = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 	usrp_dev->issue_stream_cmd(cmd);
 
-	flush_recv(50);
-
+	flush_recv(100);
+	std:cout<<"full:  "<<ts.get_full_secs()<<"  frac:  "<< ts.get_frac_secs()<<std::endl;
 	usrp_dev->set_time_now(ts);
 	aligned = false;
 
@@ -740,6 +759,13 @@ int uhd_device::check_rx_md_err(uhd::rx_metadata_t &md, ssize_t num_smpls)
 int uhd_device::readSamples(short *buf, int len, bool *overrun,
 			TIMESTAMP timestamp, bool *underrun, unsigned *RSSI)
 {
+
+//daniels hacky
+	if (timestamp ==0){
+		flush_recv((size_t)20);}
+	//if (timestamp > 3500)
+	//	exit(-1);
+
 	ssize_t rc;
 	uhd::time_spec_t ts;
 	uhd::rx_metadata_t metadata;
@@ -752,10 +778,12 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 	*underrun = false;
 
 	// Shift read time with respect to transmit clock
+	ts = convert_time(timestamp, rx_rate);
+	//std::cout << "Requested timestamp = " << ts.get_real_secs() <<"   Num:  " << len <<std::endl;
 	timestamp += ts_offset;
 
 	ts = convert_time(timestamp, rx_rate);
-	LOG(DEBUG) << "Requested timestamp = " << ts.get_real_secs();
+	//std::cout << "Requested timestamp after offset = " << ts.get_real_secs() <<"   Num:  " << len <<std::endl;
 
 	// Check that timestamp is valid
 	rc = rx_smpl_buf->avail_smpls(timestamp);
@@ -765,7 +793,6 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 		return 0;
 	}
 
-	// Receive samples from the usrp until we have enough
 	while (rx_smpl_buf->avail_smpls(timestamp) < len) {
 		size_t num_smpls = rx_stream->recv(
 					(void*)pkt_buf,
@@ -783,14 +810,17 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 			LOG(ALERT) << "UHD: Unrecoverable error, exiting...";
 			exit(-1);
 		case ERROR_TIMING:
+			LOG(ALERT) << "Timing error, restarting";
 			restart(prev_ts);
 		case ERROR_UNHANDLED:
 			continue;
 		}
 
-
+		metadata.time_spec -= uhd::time_spec_t::from_ticks(ts_crimson_start, rx_rate);
 		ts = metadata.time_spec;
 		LOG(DEBUG) << "Received timestamp = " << ts.get_real_secs();
+	//	std::cout << "Received timestamp = " << ts.get_real_secs() << "  Num Samples:  " << num_smpls<<std::endl;
+
 
 		rc = rx_smpl_buf->write(pkt_buf,
 					num_smpls,
@@ -806,9 +836,9 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 	}
 
 	// We have enough samples
-	if (dev_type == CRIMSON)
-		rc = rx_smpl_buf->read(buf, len, timestamp - ts_offset);
-	else
+	//if (dev_type == CRIMSON)
+	//	rc = rx_smpl_buf->read(buf, len, timestamp - ts_offset);
+	//else
                 rc = rx_smpl_buf->read(buf, len, timestamp);
 
 	if ((rc < 0) || (rc != len)) {
@@ -819,7 +849,7 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 
 	return len;
 }
-
+double last_timestamp;
 int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 			unsigned long long timestamp,bool isControl)
 {
@@ -828,10 +858,12 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 	metadata.start_of_burst = false;
 	metadata.end_of_burst = false;
 	metadata.time_spec = convert_time(timestamp, tx_rate);
-
+	//double time_real =metadata.time_spec.get_real_secs();
+	//std::cout<<"Get Time(): "<<  uhd::time_spec_t::get_system_time().get_full_secs()<< "    frac:  "<<uhd::time_spec_t::get_system_time().get_frac_secs()<<std::endl;
+	//std::cout<<"TIMESTAMP: "<<timestamp<<"  :  "  metadata.time_spec.get_full_secs()<< "    frac:  "<<metadata.time_spec.get_frac_secs()<<std::endl;
 	*underrun = false;
 
-	// No control packets
+	// No control packets2^16
 	if (isControl) {
 		LOG(ERR) << "Control packets not supported";
 		return 0;
@@ -842,23 +874,30 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 		drop_cnt++;
 
 		if (drop_cnt == 1) {
-			LOG(DEBUG) << "Aligning transmitter: stop burst";
+			LOG(ALERT) << "Aligning transmitter: stop burst";
 			*underrun = true;
+			if (dev_type==CRIMSON)return len;
 			metadata.end_of_burst = true;
-		} else if (drop_cnt < 30) {
-			LOG(DEBUG) << "Aligning transmitter: packet advance";
+		//} else if ((dev_type==CRIMSON) && (drop_cnt <=2)) {
+		//	LOG(ALERT) << "Aligning transmitter: packet advance";
+		//	return len;
+		}else if (drop_cnt <30) {
+			LOG(ALERT) << "Aligning transmitter: packet advance";
 			return len;
 		} else {
-			LOG(DEBUG) << "Aligning transmitter: start burst";
+			LOG(ALERT) << "Aligning transmitter: start burst";
 			metadata.start_of_burst = true;
 			aligned = true;
 			drop_cnt = 0;
 		}
 	}
+	size_t num_smpls;
+//	if (timestamp >4048320)  radioClock->get();
+	//	if (timestamp >4021500)
+			num_smpls = tx_stream->send(buf, len, metadata);
+//	else num_smpls =len;
 
-	size_t num_smpls = tx_stream->send(buf, len, metadata);
-
-	if (num_smpls != (unsigned) len) {
+	if ((num_smpls != (unsigned) len)) {
 		LOG(ALERT) << "UHD: Device send timed out";
 		LOG(ALERT) << "UHD: Version " << uhd::get_version_string();
 		LOG(ALERT) << "UHD: Unrecoverable error, exiting...";
@@ -893,10 +932,14 @@ bool uhd_device::setRxFreq(double wFreq)
 
 bool uhd_device::recv_async_msg()
 {
-	uhd::async_metadata_t md;
-	if (!usrp_dev->get_device()->recv_async_msg(md))
-		return false;
 
+	uhd::async_metadata_t md;
+	if (!usrp_dev->get_device()->recv_async_msg(md)){
+
+		//LOG(ALERT) << "async_metadata_t read false";
+		return false;
+	}
+	std::cout<<"  We got an async mess:  " << md.event_code<<std::endl;
 	// Assume that any error requires resynchronization
 	if (md.event_code != uhd::async_metadata_t::EVENT_CODE_BURST_ACK) {
 		aligned = false;
@@ -990,6 +1033,8 @@ smpl_buf::~smpl_buf()
 
 ssize_t smpl_buf::avail_smpls(TIMESTAMP timestamp) const
 {
+	//LOG(ALERT) << "time_end avail_smpls : " << time_end;
+	//LOG(ALERT) << "time_start before while: : " << time_start;
 	if (timestamp < time_start)
 		return ERROR_TIMESTAMP;
 	else if (timestamp >= time_end)
@@ -1015,6 +1060,8 @@ ssize_t smpl_buf::read(void *buf, size_t len, TIMESTAMP timestamp)
 	if (len >= buf_len)
 		return ERROR_READ;
 
+	//std::cout <<   "Start of Read| TIMESTAMP(from OpenBTS)= " << timestamp << "  len(from OpenBTS):  " << len<<std::endl;
+	//std::cout <<   "Start of Read| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
 	// How many samples should be copied
 	size_t num_smpls = time_end - timestamp;
 	if (num_smpls > len)
@@ -1038,6 +1085,8 @@ ssize_t smpl_buf::read(void *buf, size_t len, TIMESTAMP timestamp)
 	data_start = (read_start + len) % buf_len;
 	time_start = timestamp + len;
 
+	//std::cout <<   "End of Read| TIMESTAMP(from OpenBTS)= " << timestamp << "  len(from OpenBTS):  " << len<<std::endl;
+	//std::cout <<   "End of Read| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
 	if (time_start > time_end)
 		return ERROR_READ;
 	else
@@ -1059,7 +1108,9 @@ ssize_t smpl_buf::write(void *buf, size_t len, TIMESTAMP timestamp)
 	if ((timestamp + len) <= time_end)
 		return ERROR_TIMESTAMP;
 
-	// Starting index
+
+	//std::cout<<  "Start of Write| TIMESTAMP(from pkt)= " << timestamp << "  len(from pkt):  " << len <<std::endl;
+	//std::cout  << "Start of Write| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
 	size_t write_start = (data_start + (timestamp - time_start)) % buf_len;
 
 	// Write it
@@ -1077,6 +1128,8 @@ ssize_t smpl_buf::write(void *buf, size_t len, TIMESTAMP timestamp)
 	data_end = (write_start + len) % buf_len;
 	time_end = timestamp + len;
 
+	//std::cout << "End of Write| TIMESTAMP(from pkt)= " << timestamp << "  len(from pkt):  " << len<<std::endl;
+	//std::cout << "End of Write| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
 	if (((write_start + len) > buf_len) && (data_end > data_start))
 		return ERROR_OVERFLOW;
 	else if (time_end <= time_start)

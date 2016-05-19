@@ -358,8 +358,9 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
   	//std::cout << "size of complex: " << sizeof(*it) << std::endl;
   	//std::cout << it->real() << "," << it->imag() << " ";
 	complex temp;
-	if (corrType == RACH)	temp = complex(6000.0, it->imag());
-	else			temp = complex(-6000.0, it->imag());
+	if (corrType == RACH)	temp = complex(it->real(), 6000.0);
+	else			temp = complex(it->real(), -6000.0);
+	//temp = complex(it->real(), it ->imag());
 	vfile.write((char*)(&temp), (std::streamsize)sizeof(*it));
 
 	//complex temp;
@@ -403,7 +404,7 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
 				  &channelResp,
 				  &chanOffset);
     if (success) {
-      std::cout << "----- TSC burst processed\n";
+  //    std::cout << "----- TSC burst processed\n";
       SNRestimate[timeslot] = amplitude.norm2()/(mNoiseLev*mNoiseLev+1.0); // this is not highly accurate
       if (estimateChannel) {
          LOG(DEBUG) << "estimating channel...";
@@ -425,7 +426,7 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
     // RACH burst
     success = detectRACHBurst(*vectorBurst, 6.0, mSPSRx, &amplitude, &TOA);
     if (success > 0) {
-      std::cout << "----- RACH burst processed\n";
+     // std::cout << "----- RACH burst processed\n";
       channelResponse[timeslot] = NULL;
     } else if (success == 0) {
       mNoises.insert(avg);
@@ -704,7 +705,7 @@ bool Transceiver::driveTransmitPriorityQueue()
     }*/
 
 /*
-  DAB -- Just let these go through the demod.
+  //DAB -- Just let these go through the demod.
   if (GSM::Time(frameNum,timeSlot) < mTransmitDeadlineClock) {
     // stale burst from GSM core
     LOG(NOTICE) << "STALE packet on GSM->TRX interface at time "<< GSM::Time(frameNum,timeSlot);
@@ -737,7 +738,7 @@ bool Transceiver::driveTransmitPriorityQueue()
 	mTransmitPriorityQueue.write(newVec);
   }
   
-  //LOG(DEBUG) "added burst - time: " << currTime << ", RSSI: " << RSSI; // << ", data: " << newBurst; 
+  //LOG(DEBUG) "added burst - time: " << currTime << ", RSSI: " << RSSI; // << ", data: " << newBurst;
 
   return true;
 
@@ -758,12 +759,12 @@ void Transceiver::driveReceiveFIFO()
 
   if (rxBurst) { 
 
-    std::cout << "burst parameters: "
-	  << " time: " << burstTime
-	  << " RSSI: " << RSSI
-	  << " TOA: "  << TOA
-	  << " bits: " << *rxBurst << std::endl;
-    
+   // std::cout << "burst parameters: "
+	//  << " time: " << burstTime
+	//  << " RSSI: " << RSSI
+	//  << " TOA: "  << TOA
+	//  << " bits: " << *rxBurst << std::endl;
+
     char burstString[gSlotLen+10];
     burstString[0] = burstTime.TN();
     for (int i = 0; i < 4; i++)

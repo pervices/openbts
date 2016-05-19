@@ -36,6 +36,15 @@ extern "C" {
 #define RESAMP_100M_INRATE			52
 #define RESAMP_100M_OUTRATE			75
 
+/* Resampling parameters for 322 MHz clocking */
+#define RESAMP_322M_INRATE			52
+#define RESAMP_322M_OUTRATE			75
+//#define RESAMP_322M_INRATE			208
+//#define RESAMP_322M_OUTRATE			275
+//#define RESAMP_322M_INRATE			61
+//#define RESAMP_322M_OUTRATE			86
+
+
 /* Universal resampling parameters */
 #define NUMCHUNKS				24
 
@@ -111,6 +120,10 @@ bool RadioInterfaceResamp::init(int type)
 	case RadioDevice::RESAMP_100M:
 		resamp_inrate = RESAMP_100M_INRATE;
 		resamp_outrate = RESAMP_100M_OUTRATE;
+		break;
+	case RadioDevice::RESAMP_322M:
+		resamp_inrate = RESAMP_322M_INRATE;
+		resamp_outrate = RESAMP_322M_OUTRATE;
 		break;
 	case RadioDevice::NORMAL:
 	default:
