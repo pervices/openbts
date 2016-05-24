@@ -404,7 +404,7 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
 				  &channelResp,
 				  &chanOffset);
     if (success) {
-  //    std::cout << "----- TSC burst processed\n";
+  std::cout << "----- TSC burst processed\n";
       SNRestimate[timeslot] = amplitude.norm2()/(mNoiseLev*mNoiseLev+1.0); // this is not highly accurate
       if (estimateChannel) {
          LOG(DEBUG) << "estimating channel...";
@@ -426,7 +426,7 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
     // RACH burst
     success = detectRACHBurst(*vectorBurst, 6.0, mSPSRx, &amplitude, &TOA);
     if (success > 0) {
-     // std::cout << "----- RACH burst processed\n";
+    std::cout << "----- RACH burst processed\n";
       channelResponse[timeslot] = NULL;
     } else if (success == 0) {
       mNoises.insert(avg);
@@ -759,11 +759,11 @@ void Transceiver::driveReceiveFIFO()
 
   if (rxBurst) { 
 
-   // std::cout << "burst parameters: "
-	//  << " time: " << burstTime
-	//  << " RSSI: " << RSSI
-	//  << " TOA: "  << TOA
-	//  << " bits: " << *rxBurst << std::endl;
+    std::cout << "burst parameters: "
+	  << " time: " << burstTime
+	  << " RSSI: " << RSSI
+	  << " TOA: "  << TOA
+	  << " bits: " << *rxBurst << std::endl;
 
     char burstString[gSlotLen+10];
     burstString[0] = burstTime.TN();
