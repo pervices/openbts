@@ -82,8 +82,8 @@ static struct uhd_dev_offset uhd_offsets[NUM_USRP_TYPES * 2] = {
 	{ X3XX,    4, 1.1264e-4 },
 	{ UMTRX,   1, 9.9692e-5 },
 	{ UMTRX,   4, 7.3846e-5 },	
-	{ CRIMSON, 1, 0 		},
-	{ CRIMSON, 4, 0			}
+	{ CRIMSON, 1, 0 },
+	{ CRIMSON, 4, 0}
 
 };
 
@@ -637,7 +637,6 @@ bool uhd_device::flush_recv(size_t num_pkts)
 	// Use .01 sec instead of the default .1 sec
 	timeout = .01;
 	if (dev_type == CRIMSON)timeout = .0007;
-
 	for (size_t i = 0; i < num_pkts; i++) {
 		std::cout<<"num_pkts: "<<i<<std::endl;
 		num_smpls = rx_stream->recv(buff, rx_spp, md,
@@ -650,9 +649,8 @@ bool uhd_device::flush_recv(size_t num_pkts)
 				continue;
 			}
 		}
-		//Apply new offset to align current read to current data... this is because we cant set rx timestamps
+		//Apply new offset to allign current read to current data... this is because we cant set rx timestamps
 		if (dev_type == CRIMSON) ts_crimson_start = convert_time(md.time_spec, this->rx_rate) + (TIMESTAMP)num_smpls;
-		std::cout << "TS_CRIMSON_START: " << ts_crimson_start << std::endl;
 	}
 	return true;
 }
@@ -781,11 +779,11 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 
 	// Shift read time with respect to transmit clock
 	ts = convert_time(timestamp, rx_rate);
-	std::cout << "Requested timestamp = " << ts.get_real_secs() <<"   Num:  " << len <<std::endl;
+	//std::cout << "Requested timestamp = " << ts.get_real_secs() <<"   Num:  " << len <<std::endl;
 	timestamp += ts_offset;
 
 	ts = convert_time(timestamp, rx_rate);
-	std::cout << "Requested timestamp after offset = " << ts.get_real_secs() <<"   Num:  " << len <<std::endl;
+	//std::cout << "Requested timestamp after offset = " << ts.get_real_secs() <<"   Num:  " << len <<std::endl;
 
 	// Check that timestamp is valid
 	rc = rx_smpl_buf->avail_smpls(timestamp);
@@ -814,7 +812,6 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 		case ERROR_TIMING:
 			LOG(ALERT) << "Timing error, restarting";
 			restart(prev_ts);
-			break;
 		case ERROR_UNHANDLED:
 			continue;
 		}
@@ -861,10 +858,9 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 	metadata.start_of_burst = false;
 	metadata.end_of_burst = false;
 	metadata.time_spec = convert_time(timestamp, tx_rate);
-
 	//double time_real =metadata.time_spec.get_real_secs();
-	std::cout<<"Get Time(): "<<  uhd::time_spec_t::get_system_time().get_full_secs()<< "    frac:  "<<uhd::time_spec_t::get_system_time().get_frac_secs()<<std::endl;
-	std::cout<<"TIMESTAMP: "<<timestamp<<"  :  " << metadata.time_spec.get_full_secs()<< "    frac:  "<<metadata.time_spec.get_frac_secs() << std::endl;
+	//std::cout<<"Get Time(): "<<  uhd::time_spec_t::get_system_time().get_full_secs()<< "    frac:  "<<uhd::time_spec_t::get_system_time().get_frac_secs()<<std::endl;
+	//std::cout<<"TIMESTAMP: "<<timestamp<<"  :  "  metadata.time_spec.get_full_secs()<< "    frac:  "<<metadata.time_spec.get_frac_secs()<<std::endl;
 	*underrun = false;
 
 	// No control packets2^16
@@ -940,7 +936,7 @@ bool uhd_device::recv_async_msg()
 	uhd::async_metadata_t md;
 	if (!usrp_dev->get_device()->recv_async_msg(md)){
 
-		LOG(ALERT) << "async_metadata_t read false";
+		//LOG(ALERT) << "async_metadata_t read false";
 		return false;
 	}
 	std::cout<<"  We got an async mess:  " << md.event_code<<std::endl;
@@ -1037,8 +1033,8 @@ smpl_buf::~smpl_buf()
 
 ssize_t smpl_buf::avail_smpls(TIMESTAMP timestamp) const
 {
-	LOG(ALERT) << "time_end avail_smpls : " << time_end;
-	LOG(ALERT) << "time_start before while: : " << time_start;
+	//LOG(ALERT) << "time_end avail_smpls : " << time_end;
+	//LOG(ALERT) << "time_start before while: : " << time_start;
 	if (timestamp < time_start)
 		return ERROR_TIMESTAMP;
 	else if (timestamp >= time_end)
@@ -1064,8 +1060,8 @@ ssize_t smpl_buf::read(void *buf, size_t len, TIMESTAMP timestamp)
 	if (len >= buf_len)
 		return ERROR_READ;
 
-	std::cout <<   "Start of Read| TIMESTAMP(from OpenBTS)= " << timestamp << "  len(from OpenBTS):  " << len<<std::endl;
-	std::cout <<   "Start of Read| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
+	//std::cout <<   "Start of Read| TIMESTAMP(from OpenBTS)= " << timestamp << "  len(from OpenBTS):  " << len<<std::endl;
+	//std::cout <<   "Start of Read| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
 	// How many samples should be copied
 	size_t num_smpls = time_end - timestamp;
 	if (num_smpls > len)
@@ -1089,8 +1085,8 @@ ssize_t smpl_buf::read(void *buf, size_t len, TIMESTAMP timestamp)
 	data_start = (read_start + len) % buf_len;
 	time_start = timestamp + len;
 
-	std::cout <<   "End of Read| TIMESTAMP(from OpenBTS)= " << timestamp << "  len(from OpenBTS):  " << len<<std::endl;
-	std::cout <<   "End of Read| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
+	//std::cout <<   "End of Read| TIMESTAMP(from OpenBTS)= " << timestamp << "  len(from OpenBTS):  " << len<<std::endl;
+	//std::cout <<   "End of Read| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
 	if (time_start > time_end)
 		return ERROR_READ;
 	else
@@ -1113,8 +1109,8 @@ ssize_t smpl_buf::write(void *buf, size_t len, TIMESTAMP timestamp)
 		return ERROR_TIMESTAMP;
 
 
-	std::cout<<  "Start of Write| TIMESTAMP(from pkt)= " << timestamp << "  len(from pkt):  " << len <<std::endl;
-	std::cout  << "Start of Write| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
+	//std::cout<<  "Start of Write| TIMESTAMP(from pkt)= " << timestamp << "  len(from pkt):  " << len <<std::endl;
+	//std::cout  << "Start of Write| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
 	size_t write_start = (data_start + (timestamp - time_start)) % buf_len;
 
 	// Write it
@@ -1132,8 +1128,8 @@ ssize_t smpl_buf::write(void *buf, size_t len, TIMESTAMP timestamp)
 	data_end = (write_start + len) % buf_len;
 	time_end = timestamp + len;
 
-	std::cout << "End of Write| TIMESTAMP(from pkt)= " << timestamp << "  len(from pkt):  " << len<<std::endl;
-	std::cout << "End of Write| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
+	//std::cout << "End of Write| TIMESTAMP(from pkt)= " << timestamp << "  len(from pkt):  " << len<<std::endl;
+	//std::cout << "End of Write| Time Start= " << time_start << "  Time End:  " << time_end<<std::endl;
 	if (((write_start + len) > buf_len) && (data_end > data_start))
 		return ERROR_OVERFLOW;
 	else if (time_end <= time_start)
