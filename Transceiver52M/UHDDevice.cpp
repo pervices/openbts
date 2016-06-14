@@ -579,6 +579,8 @@ int uhd_device::open(const std::string &args, bool extref)
 
 	// Create TX and RX streamers
 	uhd::stream_args_t stream_args("sc16");
+	stream_args.channels.clear();
+	stream_args.channels.push_back(1);	// Set to Channel TXB & RXB
 	tx_stream = usrp_dev->get_tx_stream(stream_args);
 	rx_stream = usrp_dev->get_rx_stream(stream_args);
 
@@ -649,7 +651,7 @@ bool uhd_device::flush_recv(size_t num_pkts)
 				continue;
 			}
 		}
-		//Apply new offset to allign current read to current data... this is because we cant set rx timestamps
+		//Apply new offset to align current read to current data... this is because we cant set rx timestamps
 		if (dev_type == CRIMSON) ts_crimson_start = convert_time(md.time_spec, this->rx_rate) + (TIMESTAMP)num_smpls;
 	}
 	return true;
@@ -760,11 +762,11 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 			TIMESTAMP timestamp, bool *underrun, unsigned *RSSI)
 {
 
-//daniels hacky
-	if (timestamp ==0){
-		flush_recv((size_t)20);}
-	//if (timestamp > 3500)
-	//	exit(-1);
+////daniels hacky
+//	if (timestamp ==0){
+//		flush_recv((size_t)20);}
+//	//if (timestamp > 3500)
+//	//	exit(-1);
 
 	ssize_t rc;
 	uhd::time_spec_t ts;
