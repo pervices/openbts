@@ -580,8 +580,10 @@ int uhd_device::open(const std::string &args, bool extref)
 	// Create TX and RX streamers
 	uhd::stream_args_t stream_args("sc16");
 	stream_args.channels.clear();
-	stream_args.channels.push_back(1);	// Set to Channel TXB & RXB
+	stream_args.channels.push_back(1);	// Set to Channel TXB
 	tx_stream = usrp_dev->get_tx_stream(stream_args);
+	stream_args.channels.clear();
+	stream_args.channels.push_back(0);	// Set to Channel RXA
 	rx_stream = usrp_dev->get_rx_stream(stream_args);
 
 	// Number of samples per over-the-wire packet
