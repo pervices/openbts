@@ -640,7 +640,7 @@ bool uhd_device::flush_recv(size_t num_pkts)
 	float timeout;
 	// Use .01 sec instead of the default .1 sec
 	timeout = .01;
-	if (dev_type == CRIMSON)timeout = .0007;
+//	if (dev_type == CRIMSON)timeout = .0007;
 	for (size_t i = 0; i < num_pkts; i++) {
 		std::cout<<"num_pkts: "<<i<<std::endl;
 		num_smpls = rx_stream->recv(buff, rx_spp, md,
@@ -764,11 +764,11 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 			TIMESTAMP timestamp, bool *underrun, unsigned *RSSI)
 {
 
-////daniels hacky
-//	if (timestamp ==0){
-//		flush_recv((size_t)20);}
-//	//if (timestamp > 3500)
-//	//	exit(-1);
+//daniels hacky
+	if (timestamp ==0){
+		flush_recv((size_t)20);}
+	//if (timestamp > 3500)
+	//	exit(-1);
 
 	ssize_t rc;
 	uhd::time_spec_t ts;
