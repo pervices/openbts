@@ -622,7 +622,7 @@ int main(int argc, char *argv[])
 		transceiverThread.start((void*(*)(void*)) startTransceiver, NULL);
 		// sleep to let the FPGA code load
 		// TODO: we should be "pinging" the radio instead of sleeping
-		sleep(5);
+		sleep(30);
 	} else {
 		LOG(NOTICE) << "transceiver already running";
 	}
