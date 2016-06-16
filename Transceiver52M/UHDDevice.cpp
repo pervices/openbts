@@ -657,7 +657,7 @@ bool uhd_device::flush_recv(size_t num_pkts)
 		if (dev_type == CRIMSON) {
 			ts_crimson_start = convert_time(md.time_spec, this->rx_rate) + (TIMESTAMP)num_smpls;
 		}
-		}
+
 	}
 	return true;
 }
