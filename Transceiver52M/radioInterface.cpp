@@ -160,7 +160,7 @@ void RadioInterface::start()
   readTimestamp = mRadio->initialReadTimestamp();
   mRadio->start(); 
   LOG(DEBUG) << "Radio started";
-  mRadio->updateAlignment(writeTimestamp-10000); 
+  mRadio->updateAlignment(writeTimestamp-10000);
   mRadio->updateAlignment(writeTimestamp-10000);
 
   mOn = true;

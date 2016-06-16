@@ -654,7 +654,10 @@ bool uhd_device::flush_recv(size_t num_pkts)
 			}
 		}
 		//Apply new offset to align current read to current data... this is because we cant set rx timestamps
-		if (dev_type == CRIMSON) ts_crimson_start = convert_time(md.time_spec, this->rx_rate) + (TIMESTAMP)num_smpls;
+		if (dev_type == CRIMSON) {
+			ts_crimson_start = convert_time(md.time_spec, this->rx_rate) + (TIMESTAMP)num_smpls;
+		}
+		}
 	}
 	return true;
 }
@@ -766,7 +769,7 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 
 //daniels hacky
 	if (timestamp ==0){
-		flush_recv((size_t)20);}
+		flush_recv((size_t)100);}
 	//if (timestamp > 3500)
 	//	exit(-1);
 
@@ -782,7 +785,6 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 	*underrun = false;
 
 	// Shift read time with respect to transmit clock
-	ts = convert_time(timestamp, rx_rate);
 	//std::cout << "Requested timestamp = " << ts.get_real_secs() <<"   Num:  " << len <<std::endl;
 	timestamp += ts_offset;
 
@@ -822,6 +824,7 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 
 		metadata.time_spec -= uhd::time_spec_t::from_ticks(ts_crimson_start, rx_rate);
 		ts = metadata.time_spec;
+
 		LOG(DEBUG) << "Received timestamp = " << ts.get_real_secs();
 	//	std::cout << "Received timestamp = " << ts.get_real_secs() << "  Num Samples:  " << num_smpls<<std::endl;
 
@@ -885,7 +888,7 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 		//} else if ((dev_type==CRIMSON) && (drop_cnt <=2)) {
 		//	LOG(ALERT) << "Aligning transmitter: packet advance";
 		//	return len;
-		}else if (drop_cnt <30) {
+		}else if (drop_cnt <400) {
 			LOG(ALERT) << "Aligning transmitter: packet advance";
 			return len;
 		} else {
