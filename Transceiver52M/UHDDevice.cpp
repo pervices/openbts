@@ -667,9 +667,10 @@ void uhd_device::restart(uhd::time_spec_t ts)
 	uhd::stream_cmd_t cmd = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 	usrp_dev->issue_stream_cmd(cmd);
 
-	flush_recv(100);
 	std:cout<<"full:  "<<ts.get_full_secs()<<"  frac:  "<< ts.get_frac_secs()<<std::endl;
 	usrp_dev->set_time_now(ts);
+
+	flush_recv(100);
 	aligned = false;
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
@@ -888,7 +889,7 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 		//} else if ((dev_type==CRIMSON) && (drop_cnt <=2)) {
 		//	LOG(ALERT) << "Aligning transmitter: packet advance";
 		//	return len;
-		}else if (drop_cnt <400) {
+		}else if (drop_cnt < 80) {
 			LOG(ALERT) << "Aligning transmitter: packet advance";
 			return len;
 		} else {
