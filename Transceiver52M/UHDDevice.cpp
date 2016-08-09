@@ -296,6 +296,7 @@ private:
 
 	bool started;
 	bool aligned;
+	bool restarted;
 	bool skip_rx;
 
 	size_t rx_pkt_cnt;
@@ -355,7 +356,7 @@ uhd_device::uhd_device(int sps, bool skip_rx)
 	  rx_gain(0.0), rx_gain_min(0.0), rx_gain_max(0.0),
 	  tx_freq(0.0), rx_freq(0.0), tx_spp(0), rx_spp(0),
 	  started(false), aligned(false), rx_pkt_cnt(0), drop_cnt(0),
-	  prev_ts(0,0), ts_offset(0), rx_smpl_buf(NULL)
+	  prev_ts(0,0), ts_offset(0), rx_smpl_buf(NULL),restarted(false)
 {
 	this->sps = sps;
 	this->skip_rx = skip_rx;
@@ -604,7 +605,7 @@ int uhd_device::open(const std::string &args, bool extref)
 			return -1;
 	}
 	// Create receive buffer
-	size_t buf_len = SAMPLE_BUF_SZ / sizeof(uint32_t);
+	size_t buf_len = SAMPLE_BUF_SZ*32;// sizeof(uint32_t);	// Jumbo Size it (~134MB)
 	rx_smpl_buf = new smpl_buf(buf_len, rx_rate);
 
 	//Move initialize gains.
@@ -670,19 +671,20 @@ bool uhd_device::flush_recv(size_t num_pkts)
 
 void uhd_device::restart(uhd::time_spec_t ts)
 {
+	restarted = true;
 	uhd::stream_cmd_t cmd = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
-	usrp_dev->issue_stream_cmd(cmd);
+	usrp_dev->issue_stream_cmd(cmd, 1);
 
-	usrp_dev->set_time_now(ts);
-	
-	flush_recv(100);
+	flush_recv(100);	// at least 10ms wait will happen here
 
-
+	//usrp_dev->set_time_now(ts);	// does nothing at the moment
+	//usleep(2000);
 	aligned = false;
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 	cmd.stream_now = true;
-	usrp_dev->issue_stream_cmd(cmd);
+	usrp_dev->issue_stream_cmd(cmd, 1);
+	usleep(2000);	// 2ms for stream command issue. (2~4 packets in buffer now)
 }
 
 bool uhd_device::start()
@@ -785,15 +787,20 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 	*overrun = false;
 	*underrun = false;
 
+	TIMESTAMP offset_timestamp;
+	TIMESTAMP crimson_offset_timestamp;
+
 	// Shift read time with respect to transmit clock
 	std::cout << "Requested timestamp = " << timestamp << "   Num:  " << len << std::endl;
-	timestamp += ts_offset;
+	//timestamp += ts_offset;
+	offset_timestamp = timestamp + ts_offset;
+	crimson_offset_timestamp = timestamp + ts_offset + ts_crimson_start;
 
-	ts = convert_time(timestamp, rx_rate);
-	std::cout << "Requested timestamp after offset = " << timestamp << "   Ticks:  " << ts.get_real_secs() << std::endl;
+	ts = convert_time(offset_timestamp, rx_rate);
+	std::cout << "Requested timestamp after offset = " << offset_timestamp << "   Ticks:  " << ts.get_real_secs() << std::endl;
 
 	// Check that timestamp is valid
-	rc = rx_smpl_buf->avail_smpls(timestamp);
+	rc = rx_smpl_buf->avail_smpls(offset_timestamp);
 
 	if (rc < 0) {
 		LOG(ERR) << rx_smpl_buf->str_code(rc);
@@ -801,7 +808,7 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 		return 0;
 	}
 
-	while (rx_smpl_buf->avail_smpls(timestamp) < len) {
+	while (rx_smpl_buf->avail_smpls(offset_timestamp) < len) {
 		size_t num_smpls = rx_stream->recv(
 					(void*)pkt_buf,
 					rx_spp,
@@ -810,17 +817,18 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 					true);
 		rx_pkt_cnt++;
 
-//		if ( (dev_type == CRIMSON) && ( !aligned || (timestamp - ts_offset) == 0) )  
-                if ( (dev_type == CRIMSON) && ( (timestamp - ts_offset) == 0) )  {
-                	ts_crimson_start = convert_time(metadata.time_spec, rx_rate) - ((TIMESTAMP)timestamp - ts_offset) ;
-	        }
+//		if ( (dev_type == CRIMSON) && ( !aligned || (timestamp - ts_offset) == 0) )  {
+		if ( (dev_type == CRIMSON) && ((timestamp == 0) || restarted))  {
+				ts_crimson_start = convert_time(metadata.time_spec, rx_rate) - timestamp;
+				restarted = false;
+		}
  
-	        std::cout << "Initial Meta-Timestamp: " << metadata.time_spec.get_real_secs() << std::endl;
+	    std::cout << "Initial Meta-Timestamp: " << metadata.time_spec.get_real_secs() << std::endl;
 		std::cout << "TS_CRIMSON_START: " << ts_crimson_start << std::endl;
 
-		metadata.time_spec -= uhd::time_spec_t::from_ticks(ts_crimson_start, rx_rate);
+		metadata.time_spec -= uhd::time_spec_t::from_ticks(ts_crimson_start, rx_rate);	// metadata should be 0 now
 
-                std::cout << "Post Meta-Timestamp: " << metadata.time_spec.get_real_secs() << std::endl;
+		std::cout << "Post Meta-Timestamp: " << metadata.time_spec.get_real_secs() << std::endl;
 
 		rc = check_rx_md_err(metadata, num_smpls);
 
@@ -836,9 +844,9 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 			continue;
 		}
 	
-
-        //	LOG(DEBUG) << "Received timestamp = " << ts.get_real_secs();
-	//	std::cout << "Received timestamp = " << ts.get_real_secs() << "  Num Samples:  " << num_smpls<<std::endl;
+		ts = metadata.time_spec;
+        LOG(DEBUG) << "Received timestamp = " << ts.get_real_secs();
+//		std::cout << "Received timestamp = "  << ts.get_real_secs() << "  Num Samples:  " << num_smpls <<std::endl;
 
 
 		rc = rx_smpl_buf->write(pkt_buf,
@@ -859,10 +867,10 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 //	if (dev_type == CRIMSON)
 //		rc = rx_smpl_buf->read(buf, len, timestamp); //Should have been factored in above.
 //	else
-                std::cout << "Read From Timestamp: " << timestamp << std::endl;
-		std::cout << "------------------------------------------------" << std::endl;
+	std::cout << "Read From Timestamp: " << offset_timestamp << std::endl;
+	std::cout << "------------------------------------------------" << std::endl;
 
-                rc = rx_smpl_buf->read(buf, len, timestamp);
+	rc = rx_smpl_buf->read(buf, len, offset_timestamp);
 
 	if ((rc < 0) || (rc != len)) {
 		LOG(ERR) << rx_smpl_buf->str_code(rc);
@@ -904,7 +912,7 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 		//} else if ((dev_type==CRIMSON) && (drop_cnt <=2)) {
 		//	LOG(ALERT) << "Aligning transmitter: packet advance";
 		//	return len;
-		}else if (drop_cnt < 200) {
+		}else if (drop_cnt < 30) {
 			LOG(ALERT) << "Aligning transmitter: packet advance";
 			return len;
 		} else {
