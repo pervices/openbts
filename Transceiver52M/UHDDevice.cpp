@@ -605,7 +605,7 @@ int uhd_device::open(const std::string &args, bool extref)
 			return -1;
 	}
 	// Create receive buffer
-	size_t buf_len = SAMPLE_BUF_SZ*32;// sizeof(uint32_t);	// Jumbo Size it (~134MB)
+	size_t buf_len = SAMPLE_BUF_SZ / sizeof(uint32_t);
 	rx_smpl_buf = new smpl_buf(buf_len, rx_rate);
 
 	//Move initialize gains.
@@ -660,7 +660,7 @@ bool uhd_device::flush_recv(size_t num_pkts)
 				continue;
 			}
 		}
-		//Apply new offset to align current read to current data... this is because we cant set rx timestamps
+//		//Apply new offset to align current read to current data... this is because we cant set rx timestamps
 //		if (dev_type == CRIMSON) {
 //			ts_crimson_start = convert_time(md.time_spec, this->rx_rate) + (TIMESTAMP)num_smpls;
 //		}
@@ -683,7 +683,10 @@ void uhd_device::restart(uhd::time_spec_t ts)
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 	cmd.stream_now = true;
+uhd::time_spec_t start = uhd::time_spec_t::get_system_time();
 	usrp_dev->issue_stream_cmd(cmd, 1);
+uhd::time_spec_t duration = uhd::time_spec_t::get_system_time() - start;
+std::cout << "RAM: Stream CMD Time: " << duration.get_real_secs() << "\n";
 	usleep(2000);	// 2ms for stream command issue. (2~4 packets in buffer now)
 }
 
@@ -818,8 +821,9 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 		rx_pkt_cnt++;
 
 //		if ( (dev_type == CRIMSON) && ( !aligned || (timestamp - ts_offset) == 0) )  {
-		if ( (dev_type == CRIMSON) && ((timestamp == 0) || restarted))  {
-				ts_crimson_start = convert_time(metadata.time_spec, rx_rate) - timestamp;
+		if ( (dev_type == CRIMSON) && (restarted || (timestamp == 0)))  {
+				ts_crimson_start = convert_time((metadata.time_spec - prev_ts), rx_rate);
+				std::cout << "RAM: Restarted: Prev_TS:" << prev_ts.get_real_secs() << "\n";
 				restarted = false;
 		}
  
@@ -912,7 +916,7 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 		//} else if ((dev_type==CRIMSON) && (drop_cnt <=2)) {
 		//	LOG(ALERT) << "Aligning transmitter: packet advance";
 		//	return len;
-		}else if (drop_cnt < 30) {
+		}else if (drop_cnt < 40) {
 			LOG(ALERT) << "Aligning transmitter: packet advance";
 			return len;
 		} else {
