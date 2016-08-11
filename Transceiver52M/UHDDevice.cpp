@@ -655,6 +655,7 @@ bool uhd_device::flush_recv(size_t num_pkts)
 		if (!num_smpls) {
 			switch (md.error_code) {
 			case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT:
+				std::cout << "RAM: FLUSH_RECV: TIMEOUT: " << i << "\n";
 				return true;
 			default:
 				continue;
@@ -675,19 +676,14 @@ void uhd_device::restart(uhd::time_spec_t ts)
 	uhd::stream_cmd_t cmd = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 	usrp_dev->issue_stream_cmd(cmd, 1);
 
-	flush_recv(100);	// at least 10ms wait will happen here
+	flush_recv(300);	// at least 10ms wait will happen here
 
-	//usrp_dev->set_time_now(ts);	// does nothing at the moment
-	//usleep(2000);
+	usrp_dev->set_time_now(ts);	// does nothing at the moment
 	aligned = false;
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 	cmd.stream_now = true;
-uhd::time_spec_t start = uhd::time_spec_t::get_system_time();
 	usrp_dev->issue_stream_cmd(cmd, 1);
-uhd::time_spec_t duration = uhd::time_spec_t::get_system_time() - start;
-std::cout << "RAM: Stream CMD Time: " << duration.get_real_secs() << "\n";
-	usleep(2000);	// 2ms for stream command issue. (2~4 packets in buffer now)
 }
 
 bool uhd_device::start()
@@ -823,14 +819,14 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 //		if ( (dev_type == CRIMSON) && ( !aligned || (timestamp - ts_offset) == 0) )  {
 		if ( (dev_type == CRIMSON) && (restarted || (timestamp == 0)))  {
 				ts_crimson_start = convert_time((metadata.time_spec - prev_ts), rx_rate);
-				std::cout << "RAM: Restarted: Prev_TS:" << prev_ts.get_real_secs() << "\n";
+				std::cout << "\n\n\nRAM: Restarted: Prev_TS:" << prev_ts.get_real_secs() << "\n\n\n";
 				restarted = false;
 		}
  
 	    std::cout << "Initial Meta-Timestamp: " << metadata.time_spec.get_real_secs() << std::endl;
 		std::cout << "TS_CRIMSON_START: " << ts_crimson_start << std::endl;
 
-		metadata.time_spec -= uhd::time_spec_t::from_ticks(ts_crimson_start, rx_rate);	// metadata should be 0 now
+		metadata.time_spec -= uhd::time_spec_t::from_ticks(ts_crimson_start, rx_rate);	// metadata should be prev_ts now
 
 		std::cout << "Post Meta-Timestamp: " << metadata.time_spec.get_real_secs() << std::endl;
 
@@ -916,7 +912,7 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 		//} else if ((dev_type==CRIMSON) && (drop_cnt <=2)) {
 		//	LOG(ALERT) << "Aligning transmitter: packet advance";
 		//	return len;
-		}else if (drop_cnt < 40) {
+		}else if (drop_cnt < 30) {
 			LOG(ALERT) << "Aligning transmitter: packet advance";
 			return len;
 		} else {
