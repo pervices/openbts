@@ -674,16 +674,16 @@ void uhd_device::restart(uhd::time_spec_t ts)
 {
 	restarted = true;
 	uhd::stream_cmd_t cmd = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
-	usrp_dev->issue_stream_cmd(cmd, 1);
+	usrp_dev->issue_stream_cmd(cmd, 0);
 
-	flush_recv(300);	// at least 10ms wait will happen here
+	flush_recv(50);	// at least 10ms wait will happen here
 
 	usrp_dev->set_time_now(ts);	// does nothing at the moment
 	aligned = false;
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 	cmd.stream_now = true;
-	usrp_dev->issue_stream_cmd(cmd, 1);
+	usrp_dev->issue_stream_cmd(cmd, 0);
 }
 
 bool uhd_device::start()
@@ -737,7 +737,7 @@ int uhd_device::check_rx_md_err(uhd::rx_metadata_t &md, ssize_t num_smpls)
 
 	if (!num_smpls) {
 		LOG(ERR) << str_code(md);
-
+std::cout << "RAM: NUM_SMPLS failure: " << num_smpls << ", error_code: " << md.error_code << "\n";
 		switch (md.error_code) {
 		case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT:
 			LOG(ALERT) << "UHD: Receive timed out";
@@ -817,9 +817,11 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 		rx_pkt_cnt++;
 
 //		if ( (dev_type == CRIMSON) && ( !aligned || (timestamp - ts_offset) == 0) )  {
-		if ( (dev_type == CRIMSON) && (restarted || (timestamp == 0)))  {
+		if ( (dev_type == CRIMSON) && restarted )  {
 				ts_crimson_start = convert_time((metadata.time_spec - prev_ts), rx_rate);
-				std::cout << "\n\n\nRAM: Restarted: Prev_TS:" << prev_ts.get_real_secs() << "\n\n\n";
+			    std::cout << "\n\n\nInitial Meta-Timestamp: " << metadata.time_spec.get_real_secs() << std::endl;
+				std::cout << "TS_CRIMSON_START: " << ts_crimson_start << std::endl;
+				std::cout << "RAM: Restarted: Prev_TS:" << prev_ts.get_real_secs() << "\n\n\n";
 				restarted = false;
 		}
  
