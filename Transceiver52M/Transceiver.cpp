@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include "Transceiver.h"
 #include <Logger.h>
+#include <fstream>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -350,6 +351,14 @@ SoftVector *Transceiver::pullRadioVector(GSM::Time &wTime,
   }
 
   signalVector *vectorBurst = rxBurst;
+
+ofstream vfile("vector-dump.bin", ios::out | ios::app | ios::binary);
+for (signalVector::const_iterator it = vectorBurst->begin(); it != vectorBurst->end(); it++) {
+	complex temp;
+	if (corrType == RACH)	temp = complex(it->real(), 6000.0);
+	else			temp = complex(it->real(), -6000.0);
+	vfile.write((char*)(&temp), (std::streamsize)sizeof(*it));
+}
 
   energyDetect(*vectorBurst, 20 * mSPSRx, 0.0, &avg);
 

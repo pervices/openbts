@@ -565,7 +565,11 @@ int uhd_device::open(const std::string &args, bool extref)
 
 	// Create TX and RX streamers
 	uhd::stream_args_t stream_args("sc16");
+stream_args.channels.clear();
+stream_args.channels.push_back(1);
 	tx_stream = usrp_dev->get_tx_stream(stream_args);
+stream_args.channels.clear();
+stream_args.channels.push_back(1);
 	rx_stream = usrp_dev->get_rx_stream(stream_args);
 
 	// Number of samples per over-the-wire packet
@@ -639,7 +643,7 @@ bool uhd_device::flush_recv(size_t num_pkts)
 void uhd_device::restart(uhd::time_spec_t ts)
 {
 	uhd::stream_cmd_t cmd = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
-	usrp_dev->issue_stream_cmd(cmd);
+	usrp_dev->issue_stream_cmd(cmd, 1);
 
 	flush_recv(50);
 
@@ -648,7 +652,7 @@ void uhd_device::restart(uhd::time_spec_t ts)
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 	cmd.stream_now = true;
-	usrp_dev->issue_stream_cmd(cmd);
+	usrp_dev->issue_stream_cmd(cmd, 1);
 }
 
 bool uhd_device::start()
@@ -806,9 +810,9 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 	}
 
 	// We have enough samples
-	if (dev_type == CRIMSON)
-		rc = rx_smpl_buf->read(buf, len, timestamp - ts_offset);
-	else
+	//if (dev_type == CRIMSON)
+	//	rc = rx_smpl_buf->read(buf, len, timestamp - ts_offset);
+	//else
                 rc = rx_smpl_buf->read(buf, len, timestamp);
 
 	if ((rc < 0) || (rc != len)) {
