@@ -79,8 +79,8 @@ static struct uhd_dev_offset uhd_offsets[NUM_USRP_TYPES * 2] = {
 	{ X3XX,    4, 1.1264e-4 },
 	{ UMTRX,   1, 9.9692e-5 },
 	{ UMTRX,   4, 7.3846e-5 },
-	{ CRIMSON, 1, 1.0180e-3 },
-	{ CRIMSON, 4, 1.4000e-3 },
+	{ CRIMSON, 1, 0.0000e-3 },
+	{ CRIMSON, 4, 0.0298e-3 },//0.0355
 };
 
 static double get_dev_offset(enum uhd_dev_type type, int sps)
@@ -648,11 +648,11 @@ void uhd_device::restart(uhd::time_spec_t ts)
 	flush_recv(50);
 
 	usrp_dev->set_time_now(ts);
-	aligned = false;
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 	cmd.stream_now = true;
 	usrp_dev->issue_stream_cmd(cmd, 1);
+	aligned = false;
 }
 
 bool uhd_device::start()
@@ -849,7 +849,7 @@ int uhd_device::writeSamples(short *buf, int len, bool *underrun,
 			LOG(DEBUG) << "Aligning transmitter: stop burst";
 			*underrun = true;
 			metadata.end_of_burst = true;
-		} else if (drop_cnt < 30) {
+		} else if (drop_cnt < 8) {
 			LOG(DEBUG) << "Aligning transmitter: packet advance";
 			return len;
 		} else {
