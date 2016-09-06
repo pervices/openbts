@@ -80,7 +80,7 @@ static struct uhd_dev_offset uhd_offsets[NUM_USRP_TYPES * 2] = {
 	{ UMTRX,   1, 9.9692e-5 },
 	{ UMTRX,   4, 7.3846e-5 },
 	{ CRIMSON, 1, 1.0180e-3 },
-	{ CRIMSON, 4, 1.4000e-3 },
+	{ CRIMSON, 4, 1.2000e-3 },
 };
 
 static double get_dev_offset(enum uhd_dev_type type, int sps)
@@ -565,7 +565,11 @@ int uhd_device::open(const std::string &args, bool extref)
 
 	// Create TX and RX streamers
 	uhd::stream_args_t stream_args("sc16");
+stream_args.channels.clear();
+stream_args.channels.push_back(1);
 	tx_stream = usrp_dev->get_tx_stream(stream_args);
+stream_args.channels.clear();
+stream_args.channels.push_back(1);
 	rx_stream = usrp_dev->get_rx_stream(stream_args);
 
 	// Number of samples per over-the-wire packet
@@ -604,7 +608,7 @@ int uhd_device::open(const std::string &args, bool extref)
 	case X3XX:
 		return RESAMP_100M;
 	case CRIMSON:
-		return RESAMP_100M_NO_RXOFF;
+		return RESAMP_322M;
 	}
 
 	return NORMAL;
@@ -639,7 +643,7 @@ bool uhd_device::flush_recv(size_t num_pkts)
 void uhd_device::restart(uhd::time_spec_t ts)
 {
 	uhd::stream_cmd_t cmd = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
-	usrp_dev->issue_stream_cmd(cmd);
+	usrp_dev->issue_stream_cmd(cmd, 1);
 
 	flush_recv(50);
 
@@ -648,7 +652,7 @@ void uhd_device::restart(uhd::time_spec_t ts)
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 	cmd.stream_now = true;
-	usrp_dev->issue_stream_cmd(cmd);
+	usrp_dev->issue_stream_cmd(cmd, 1);
 }
 
 bool uhd_device::start()
