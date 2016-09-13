@@ -36,6 +36,7 @@
 #define X3XX_CLK_RT      104e6
 #define B100_BASE_RT     400000
 #define USRP2_BASE_RT    390625
+#define CRIMSON_BASE_RT  390625
 #define TX_AMPL          0.3
 #define SAMPLE_BUF_SZ    (1 << 20)
 
@@ -112,7 +113,6 @@ static double select_rate(uhd_dev_type type, int sps)
 		return -9999.99;
 
 	switch (type) {
-	case CRIMSON:
 	case USRP2:
 	case X3XX:
 		return USRP2_BASE_RT * sps;
@@ -121,6 +121,8 @@ static double select_rate(uhd_dev_type type, int sps)
 	case B2XX:
 	case UMTRX:
 		return GSMRATE * sps;
+	case CRIMSON:
+		return CRIMSON_BASE_RT * sps;
 	default:
 		break;
 	}
