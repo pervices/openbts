@@ -643,7 +643,7 @@ bool uhd_device::flush_recv(size_t num_pkts)
 void uhd_device::restart(uhd::time_spec_t ts)
 {
 	uhd::stream_cmd_t cmd = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
-	usrp_dev->issue_stream_cmd(cmd);
+	usrp_dev->issue_stream_cmd(cmd, 1);
 
 	flush_recv(50);
 
@@ -652,7 +652,7 @@ void uhd_device::restart(uhd::time_spec_t ts)
 
 	cmd = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
 	cmd.stream_now = true;
-	usrp_dev->issue_stream_cmd(cmd);
+	usrp_dev->issue_stream_cmd(cmd, 1);
 }
 
 bool uhd_device::start()
@@ -688,7 +688,7 @@ bool uhd_device::stop()
 	uhd::stream_cmd_t stream_cmd = 
 		uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 
-	usrp_dev->issue_stream_cmd(stream_cmd);
+	usrp_dev->issue_stream_cmd(stream_cmd, 1);
 
 	started = false;
 	return true;
