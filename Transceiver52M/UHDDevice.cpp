@@ -47,6 +47,7 @@ enum uhd_dev_type {
 	X3XX,
 	UMTRX,
 	CRIMSON,
+	CRIMSON_TNG,
 	NUM_USRP_TYPES,
 };
 
@@ -81,6 +82,8 @@ static struct uhd_dev_offset uhd_offsets[NUM_USRP_TYPES * 2] = {
 	{ UMTRX,   4, 7.3846e-5 },
 	{ CRIMSON, 1, 1.0180e-3 },
 	{ CRIMSON, 4, 2.1000e-3 },
+	{ CRIMSON_TNG, 1, 20e-6 },
+	{ CRIMSON_TNG, 4, 20e-6 },
 };
 
 static double get_dev_offset(enum uhd_dev_type type, int sps)
@@ -113,6 +116,7 @@ static double select_rate(uhd_dev_type type, int sps)
 
 	switch (type) {
 	case CRIMSON:
+	case CRIMSON_TNG:
 	case USRP2:
 	case X3XX:
 		return USRP2_BASE_RT * sps;
@@ -483,7 +487,7 @@ bool uhd_device::parse_dev_type()
 	std::string mboard_str, dev_str;
 	uhd::property_tree::sptr prop_tree;
 	size_t usrp1_str, usrp2_str, b100_str, b200_str,
-	       b210_str, x300_str, x310_str, umtrx_str, crimson_str;
+	       b210_str, x300_str, x310_str, umtrx_str, crimson_str, crimson_tng_str;
 
 	prop_tree = usrp_dev->get_device()->get_tree();
 	dev_str = prop_tree->access<std::string>("/name").get();
@@ -497,6 +501,7 @@ bool uhd_device::parse_dev_type()
 	x300_str = mboard_str.find("X300");
 	x310_str = mboard_str.find("X310");
 	umtrx_str = dev_str.find("UmTRX");
+	crimson_tng_str = dev_str.find("Crimson_TNG");
 	crimson_str = dev_str.find("Crimson");
 
 	if (usrp1_str != std::string::npos) {
@@ -524,6 +529,8 @@ bool uhd_device::parse_dev_type()
 		dev_type = USRP2;
 	} else if (umtrx_str != std::string::npos) {
 		dev_type = UMTRX;
+	} else if (crimson_tng_str != std::string::npos) {
+		dev_type = CRIMSON_TNG;
 	} else if (crimson_str != std::string::npos) {
 		dev_type = CRIMSON;
 	} else {
@@ -607,6 +614,7 @@ stream_args.channels.push_back(1);
 	case USRP2:
 	case X3XX:
 		return RESAMP_100M;
+	case CRIMSON_TNG:
 	case CRIMSON:
 		return RESAMP_100M_NO_RXOFF;
 	}
@@ -810,7 +818,7 @@ int uhd_device::readSamples(short *buf, int len, bool *overrun,
 	}
 
 	// We have enough samples
-	if (dev_type == CRIMSON)
+	if ((dev_type == CRIMSON) || (dev_type == CRIMSON_TNG))
 		rc = rx_smpl_buf->read(buf, len, timestamp - ts_offset);
 	else
                 rc = rx_smpl_buf->read(buf, len, timestamp);
