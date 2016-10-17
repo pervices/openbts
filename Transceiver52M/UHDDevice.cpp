@@ -80,7 +80,7 @@ static struct uhd_dev_offset uhd_offsets[NUM_USRP_TYPES * 2] = {
 	{ UMTRX,   1, 9.9692e-5 },
 	{ UMTRX,   4, 7.3846e-5 },
 	{ CRIMSON, 1, 1.0180e-3 },
-	{ CRIMSON, 4, 1.2000e-3 },
+	{ CRIMSON, 4, 2.1000e-3 },
 };
 
 static double get_dev_offset(enum uhd_dev_type type, int sps)
